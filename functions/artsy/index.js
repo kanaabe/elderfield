@@ -120,6 +120,68 @@ app.intent('AboutIntent', {
     }
 );
 
+app.intent('BirthIntent', {
+        "slots": {
+            "VALUE": "NAME"
+        },
+        "utterances": [
+            "when was {-|VALUE} born"
+        ]
+    },
+    function(req, res) {
+        var value = req.slot('VALUE');
+        console.log('app.BirthIntent: ' + value);
+
+        if (!value) {
+            res.say("Sorry, I didn't get that artist name. Try again?");
+            return res.shouldEndSession(false, helpText);
+        } else {
+            api.instance().then(function(api) {
+                api.matchArtist(value).then(function(artist) {
+                    var message = []
+
+                    if (artist.birthday) {
+                        message.push(_.compact([
+                            artist.nationality ? artist.nationality : 'The',
+                            "artist",
+                            artist.name,
+                            "was born",
+                            artist.hometown ? "in " + _.first(artist.hometown.split(',')) : null,
+                            artist.birthday ? "in " + _.last(artist.birthday.split(',')) : null,
+                            artist.deathday ? "and died in " + _.last(artist.deathday.split(',')) : null
+                        ]).join(' '));
+                    }
+
+                    if (artist.blurb || artist.biography) {
+                        message.push(artist.blurb || artist.biography);
+                    }
+
+                    if (message.length > 0) {
+                        res.say(removeMd(message.join('. ')));
+                        res.shouldEndSession(true);
+                    } else {
+                        res.say("Sorry, I don't know much about " + value + ". Try again?");
+                        res.shouldEndSession(false);
+                    }
+
+                    res.send();
+                }).fail(function(error) {
+                    res.say("Sorry, I couldn't find an artist " + value + ". Try again?");
+                    res.shouldEndSession(false);
+                    res.send();
+                });
+            }).fail(function(error) {
+                res.say("Sorry, I couldn't connect to Artsy. Try again?");
+                res.shouldEndSession(false);
+                res.send();
+            });
+
+            return false;
+        }
+    }
+);
+
+
 if (process.env['ENV'] == 'lambda') {
     console.log("Starting Artsy Alexa on AWS lambda.")
     exports.handle = app.lambda();
